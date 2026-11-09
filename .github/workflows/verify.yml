@@ -1,0 +1,57 @@
+name: Verify WP Utility Suite
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  wordpress:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        wordpress: ['7.0.8', '7.1.4']
+    services:
+      mariadb:
+        image: mariadb:10.11.15
+        env:
+          MARIADB_DATABASE: wpus_test
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+        ports:
+          - 33316:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=15
+    env:
+      WPUS_WORDPRESS: ${{ matrix.wordpress }}
+      WPUS_DB_PORT: '33316'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install PHP 8.3 extensions
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php8.3-cli php8.3-curl php8.3-mbstring php8.3-mysql php8.3-xml php8.3-zip
+      - name: Lint and package
+        run: |
+          find wp-utility-suite tests -name '*.php' -print0 | xargs -0 -n1 php8.3 -l
+          python3 tools/package.py
+          sha256sum --check wp-utility-suite-*.zip.sha256
+      - name: Exercise the packaged plugin
+        run: |
+          wpus_fixture=$(mktemp -d)
+          curl --fail --silent --show-error --location "https://wordpress.org/wordpress-$WPUS_WORDPRESS.zip" -o "$wpus_fixture/wp.zip"
+          curl --fail --silent --show-error --location https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar -o "$wpus_fixture/wp-cli.phar"
+          unzip -q "$wpus_fixture/wp.zip" -d "$wpus_fixture"
+          wpus_wp() { php8.3 "$wpus_fixture/wp-cli.phar" --path="$wpus_fixture/wordpress" "$@"; }
+          wpus_wp config create --dbname=wpus_test --dbuser=root --dbpass= --dbhost="127.0.0.1:$WPUS_DB_PORT" --dbprefix=wpus_ci_ --skip-check
+          wpus_wp config set WP_ENVIRONMENT_TYPE local --type=constant
+          wpus_wp config set DISABLE_WP_CRON true --raw --type=constant
+          wpus_wp core install --url=https://fixture.example.test --title=Fixture --admin_user=wpusadmin --admin_email=admin@example.test --skip-email --quiet
+          wpus_key=$(php8.3 -r 'echo base64_encode(random_bytes(32));')
+          wpus_wp config set WPUS_KEYRING "['fixture' => '$wpus_key']" --raw --type=constant --quiet
+          wpus_wp config set WPUS_ACTIVE_KEY_ID fixture --type=constant --quiet
+          wpus_wp config set WPUS_WEBHOOK_ORIGINS "['https://example.com']" --raw --type=constant --quiet
+          wpus_wp plugin install "$GITHUB_WORKSPACE"/wp-utility-suite-*.zip --activate
+          wpus_wp eval-file "$GITHUB_WORKSPACE/tests/integration.php"

@@ -1,0 +1,8 @@
+/*.zip
+/*.zip.sha256
+/wordpress-utility-suite-architecture.md
+__pycache__/
+*.pyc
+.env
+.env.*
+/wp-config.php
