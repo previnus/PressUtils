@@ -7,10 +7,13 @@ permissions:
 
 jobs:
   wordpress:
+    name: WordPress ${{ matrix.wordpress }} / PHP ${{ matrix.php }}
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         wordpress: ['7.0.8', '7.1.4']
+        php: ['8.3', '8.4', '8.5']
     services:
       mariadb:
         image: mariadb:10.11.15
@@ -29,13 +32,20 @@ jobs:
       WPUS_DB_PORT: '33316'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Install PHP 8.3 extensions
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y php8.3-cli php8.3-curl php8.3-mbstring php8.3-mysql php8.3-xml php8.3-zip
+        with:
+          persist-credentials: false
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, mysqli, sodium, xml, zip
+          coverage: none
+        env:
+          fail-fast: true
       - name: Lint and package
         run: |
-          find wp-utility-suite tests -name '*.php' -print0 | xargs -0 -n1 php8.3 -l
+          php --version
+          find wp-utility-suite tests -name '*.php' -print0 | xargs -0 -n1 php -l
           python3 tools/package.py
           sha256sum --check wp-utility-suite-*.zip.sha256
       - name: Exercise the packaged plugin
@@ -44,12 +54,12 @@ jobs:
           curl --fail --silent --show-error --location "https://wordpress.org/wordpress-$WPUS_WORDPRESS.zip" -o "$wpus_fixture/wp.zip"
           curl --fail --silent --show-error --location https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar -o "$wpus_fixture/wp-cli.phar"
           unzip -q "$wpus_fixture/wp.zip" -d "$wpus_fixture"
-          wpus_wp() { php8.3 "$wpus_fixture/wp-cli.phar" --path="$wpus_fixture/wordpress" "$@"; }
+          wpus_wp() { php "$wpus_fixture/wp-cli.phar" --path="$wpus_fixture/wordpress" "$@"; }
           wpus_wp config create --dbname=wpus_test --dbuser=root --dbpass= --dbhost="127.0.0.1:$WPUS_DB_PORT" --dbprefix=wpus_ci_ --skip-check
           wpus_wp config set WP_ENVIRONMENT_TYPE local --type=constant
           wpus_wp config set DISABLE_WP_CRON true --raw --type=constant
           wpus_wp core install --url=https://fixture.example.test --title=Fixture --admin_user=wpusadmin --admin_email=admin@example.test --skip-email --quiet
-          wpus_key=$(php8.3 -r 'echo base64_encode(random_bytes(32));')
+          wpus_key=$(php -r 'echo base64_encode(random_bytes(32));')
           wpus_wp config set WPUS_KEYRING "['fixture' => '$wpus_key']" --raw --type=constant --quiet
           wpus_wp config set WPUS_ACTIVE_KEY_ID fixture --type=constant --quiet
           wpus_wp config set WPUS_WEBHOOK_ORIGINS "['https://example.com']" --raw --type=constant --quiet

@@ -21,7 +21,7 @@ The first public package is a staging prerelease. The source review began on the
 ## Verification scope
 
 - Source inspection covered first-party access control, request validation, SQL, scoped data handling, outbound transport, privacy and lifecycle. Reachable Action Scheduler paths received targeted review. Review of the complete third-party library and any other plugins loaded on a site remains outside that coverage.
-- The GitHub Actions workflow lints PHP, builds the distributable and runs WordPress integration tests against the installed ZIP on two WordPress versions. [Actions runs](https://github.com/previnus/PressUtils/actions/workflows/verify.yml)
+- The GitHub Actions workflow lints PHP, builds the distributable and tests the installed ZIP on PHP 8.3, 8.4 and 8.5. It runs each PHP branch with WordPress 7.0.8 and 7.1.4. [Actions runs](https://github.com/previnus/PressUtils/actions/workflows/verify.yml)
 - The local fixtures exercise administrator and restricted-user access, nonce and ETag rejection, encrypted and signed webhook requests, retry and redrive, multisite behavior, shipping eligibility and the uninstall policy. DNS and cURL are simulated for delivery regressions. [Fixture instructions](../tests/README.md)
 
 ## Open limits
