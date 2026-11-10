@@ -66,7 +66,7 @@ jobs:
           wpus_wp config set WPUS_WEBHOOK_ORIGINS "['https://example.com']" --raw --type=constant --quiet
           wpus_wp plugin install "$GITHUB_WORKSPACE"/wp-utility-suite-*.zip --activate
           wpus_wp eval-file "$GITHUB_WORKSPACE/tests/integration.php"
+          wpus_wp plugin install https://downloads.wordpress.org/plugin/woocommerce.11.2.2.zip --activate
           wpus_wp option update woocommerce_custom_orders_table_enabled "$WPUS_HPOS"
           wpus_wp option update woocommerce_custom_orders_table_data_sync_enabled no
-          wpus_wp plugin install https://downloads.wordpress.org/plugin/woocommerce.11.2.2.zip --activate
           wpus_wp eval-file "$GITHUB_WORKSPACE/tests/commerce.php"

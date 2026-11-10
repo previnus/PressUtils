@@ -25,6 +25,10 @@ $assert = static function (bool $condition, string $message): void {
     WP_CLI::log('PASS ' . $message);
 };
 $hpos = OrderUtil::custom_orders_table_usage_is_enabled();
+$expectedHpos = getenv('WPUS_HPOS');
+if ($expectedHpos !== false) {
+    $assert($expectedHpos === ($hpos ? 'yes' : 'no'), 'WooCommerce uses the requested storage mode');
+}
 $assert(!$hpos || get_option('woocommerce_custom_orders_table_data_sync_enabled') !== 'yes', 'Storage mode is ' . ($hpos ? 'HPOS without compatibility sync' : 'legacy posts'));
 
 $admin = get_users(['role' => 'administrator', 'number' => 1])[0];
