@@ -3,6 +3,9 @@
 if (!defined('ABSPATH') || wp_get_environment_type() !== 'local') {
     exit;
 }
+if (defined('WP_CLI') && WP_CLI) {
+    return;
+}
 $fixtureCalls = 0;
 add_filter('pre_http_request', static function () use (&$fixtureCalls): WP_Error {
     $fixtureCalls++;
