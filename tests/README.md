@@ -14,4 +14,6 @@ For the HTTP smoke test, serve the disposable site at http://127.0.0.1:38142, en
 python tests/http-smoke.py
 ~~~
 
-Run python tools/package.py from the workspace to rebuild the installable ZIP and checksum.
+Run **python tools/package.py** from the workspace to rebuild the installable ZIP, checksum, and CycloneDX SBOM.
+
+The GitHub Actions MySQL job runs **tests/acceptance.sh** against the installed ZIP. It compares warmed public requests with PressUtils off and on, drives wp-admin with Chromium, and routes a fixture-only DNS name to a local TLS receiver. The receiver uses generated keys, accepts synthetic payloads, and checks signature, replay, retry and TLS behavior. The test seeds 10,000 encrypted rows with 60 eligible for delivery. It invokes the runner directly and projects one-minute cadence from the measured batch results. Run the full harness only on an isolated Linux runner because it temporarily changes network and DNS configuration.

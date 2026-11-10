@@ -84,7 +84,7 @@ jobs:
         if: matrix.extra
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends dnsmasq-base
+          sudo apt-get install -y --no-install-recommends dnsmasq-base redis-server
           python3 -m venv "$RUNNER_TEMP/wpus-browser"
           "$RUNNER_TEMP/wpus-browser/bin/pip" install 'playwright==1.64.1'
           "$RUNNER_TEMP/wpus-browser/bin/python" -m playwright install --with-deps chromium

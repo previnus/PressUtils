@@ -118,7 +118,18 @@ Local auditing and diagnostics are available after activation. Alerts, HTTP timi
 2. Upload the newer release ZIP using the same plugin directory. Select **Replace current with uploaded** when prompted. Open **Utility Suite** as an administrator on each active site to run setup. The upgrade from 0.1.1 clears queued order bodies that lack an erasure reference. Confirm module and scheduler status before resuming outbound work.
 3. Deactivate the plugin to retain data and pause delivery. After reactivation, review queued work and resume outbound explicitly.
 4. To keep data during uninstall, deactivate and delete the plugin. To remove suite data, back it up and opt into the purge from **Overview** or **Network Admin → Utility Suite** before uninstalling. Automatic network purge is limited to 20 sites. For larger networks use the [per-site procedure](../wp-utility-suite/readme.txt).
-5. Use WordPress **Tools → Export Personal Data** or **Tools → Erase Personal Data** for local attribution. PressUtils cancels queued order events when WooCommerce anonymizes the order. Review retained note text separately and coordinate privacy handling for previously delivered events with your integration operator.
+5. Use WordPress **Tools → Export Personal Data** or **Tools → Erase Personal Data** for local attribution. PressUtils cancels queued order events when WooCommerce anonymizes the order. If the capture lock is busy, the scheduler retries the cleanup even while outbound traffic is paused. A `commerce.erasure_failed` audit event means both the immediate cleanup and the retry write failed. Check the site's database and scheduler before resuming outbound traffic. Review retained note text separately and coordinate privacy handling for previously delivered events with your integration operator.
+
+## 7. Verify a release
+
+Download the ZIP and its matching **.zip.sha256** file into the same directory. Check the digest and verify GitHub's signed build provenance against this repository. [GitHub's artifact verification instructions](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
+
+~~~sh
+sha256sum --check wp-utility-suite-0.2.1.zip.sha256
+gh attestation verify wp-utility-suite-0.2.1.zip --repo previnus/PressUtils --source-ref refs/tags/v0.2.1
+~~~
+
+The **.cdx.json** asset lists the packaged components. Replace the version in these commands with the release you downloaded. Use release tags that include attestations.
 
 ## Support
 

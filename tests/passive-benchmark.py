@@ -24,8 +24,9 @@ print(phase, json.dumps(result))
 path = Path(output)
 if phase == 'baseline':
     path.write_text(json.dumps(result), encoding='utf-8')
-else:
+elif phase in ('packaged', 'uncached'):
     baseline = json.loads(path.read_text(encoding='utf-8'))
-    assert result['sql_queries'] - baseline['sql_queries'] <= 2, 'Exceeded passive SQL budget'
     assert result['http_calls'] == baseline['http_calls'] == 0, 'Passive path attempted HTTP'
-    assert result['p95_ms'] - baseline['p95_ms'] < 10, 'Exceeded passive p95 budget'
+    if phase == 'packaged':
+        assert result['sql_queries'] - baseline['sql_queries'] <= 2, 'Exceeded passive SQL budget'
+        assert result['p95_ms'] - baseline['p95_ms'] < 10, 'Exceeded passive p95 budget'

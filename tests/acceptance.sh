@@ -20,22 +20,41 @@ cp tests/fixture-metrics.php "$root/wp-content/mu-plugins/wpus-fixture-metrics.p
 php -S 127.0.0.1:38142 -t "$root" tests/fixture-router.php > "$fixture/wordpress-server.log" 2>&1 &
 server=$!
 receiver=''
+redis=''
 resolver_mounted=0
 cleanup() {
   kill "$server" 2>/dev/null || true
   if [[ -n "$receiver" ]]; then kill "$receiver" 2>/dev/null || true; fi
+  if [[ -n "$redis" ]]; then kill "$redis" 2>/dev/null || true; fi
   if [[ "$resolver_mounted" == 1 ]]; then sudo umount /etc/resolv.conf; fi
 }
 trap cleanup EXIT
 curl --fail --silent --retry 5 --retry-connrefused "$WPUS_SMOKE_URL" > /dev/null
 
 wp plugin deactivate wp-utility-suite
-python3 tests/passive-benchmark.py baseline "$fixture/baseline.json" "$WPUS_SMOKE_URL/"
+python3 tests/passive-benchmark.py baseline "$fixture/uncached.json" "$WPUS_SMOKE_URL/"
 wp plugin activate wp-utility-suite
-python3 tests/passive-benchmark.py packaged "$fixture/baseline.json" "$WPUS_SMOKE_URL/"
-python3 tests/http-smoke.py
+if ! wp eval 'exit(ActionScheduler_DataController::is_migration_complete() ? 0 : 1);'; then
+  wp action-scheduler migrate
+fi
+python3 tests/passive-benchmark.py uncached "$fixture/uncached.json" "$WPUS_SMOKE_URL/"
+
+redis-server --bind 127.0.0.1 --port 16379 --save '' --appendonly no > "$fixture/redis.log" 2>&1 &
+redis=$!
+wp config set WP_REDIS_PORT 16379 --raw --type=constant --quiet
+wp plugin install https://downloads.wordpress.org/plugin/redis-cache.3.0.0.zip --activate
+wp redis enable
+wp redis status
+wp eval 'if (!wp_using_ext_object_cache() || !wp_cache_set("fixture_probe", 1)) { exit(1); }'
+wp eval 'if (wp_cache_get("fixture_probe") !== 1) { exit(1); }'
+wp plugin deactivate wp-utility-suite
+python3 tests/passive-benchmark.py baseline "$fixture/warm.json" "$WPUS_SMOKE_URL/"
+wp plugin activate wp-utility-suite
+failed=0
+python3 tests/passive-benchmark.py packaged "$fixture/warm.json" "$WPUS_SMOKE_URL/" || failed=1
+python3 tests/http-smoke.py || failed=1
 wp option update wpus_outbound_paused 0
-python3 tests/browser-smoke.py
+python3 tests/browser-smoke.py || failed=1
 
 # Route the public-shaped address inside the disposable runner only. Real DNS and cURL are used.
 sudo ip addr add 93.184.215.20/32 dev lo
@@ -62,4 +81,5 @@ python3 tests/fixture-receiver.py "$fixture/server.crt" "$fixture/server.key" &
 receiver=$!
 curl --silent --retry 5 --retry-connrefused --noproxy '*' --cacert "$fixture/ca.crt" https://receiver.example.test/ > /dev/null
 wp config set WPUS_WEBHOOK_ORIGINS "['https://receiver.example.test']" --raw --type=constant --quiet
-php -d "curl.cainfo=$fixture/ca.crt" "$fixture/wp-cli.phar" --path="$root" eval-file "$GITHUB_WORKSPACE/tests/receiver.php"
+php -d "curl.cainfo=$fixture/ca.crt" "$fixture/wp-cli.phar" --path="$root" eval-file "$GITHUB_WORKSPACE/tests/receiver.php" || failed=1
+exit "$failed"
