@@ -11,16 +11,16 @@ Site auditing, performance diagnostics, private admin tools, monitoring, and opt
 Author: Previn Kalisetty Appadu <hi@previn.me>
 Author website: https://previn.me
 
-Step-by-step user guide: https://github.com/previnus/PressUtils/blob/v0.2.0/docs/USER-GUIDE.md
+Step-by-step user guide: https://github.com/previnus/PressUtils/blob/v0.2.1/docs/USER-GUIDE.md
 
 == Installation ==
 
-1. Download wp-utility-suite-0.2.0.zip and its SHA-256 file from https://github.com/previnus/PressUtils/releases/tag/v0.2.0. Compare the archive digest with the checksum file.
+1. Download wp-utility-suite-0.2.1.zip and its SHA-256 file from https://github.com/previnus/PressUtils/releases/tag/v0.2.1. Compare the archive digest with the checksum file.
 2. Open Plugins → Add New Plugin → Upload Plugin, choose the named plugin ZIP, select Install Now, then activate WP Utility Suite.
 3. Open Utility Suite → Overview and confirm the six module statuses and scheduler health. On multisite, use Network Admin → Utility Suite to check site setup and apply network-wide restrictions.
 4. Choose the desired Module settings, save and test each feature. Local audit capture and diagnostics are available immediately. Features that send traffic or change site behavior are individually opt-in.
 
-Use PHP 8.3 or newer, HTTPS and InnoDB. The verification matrix covers PHP 8.3, 8.4 and 8.5 on MariaDB 10.11. The architecture also targets MySQL 8.4. Action Scheduler 4.2.0 is included and shares its runtime with any compatible copy already loaded. WooCommerce 11.1 or newer is optional.
+Use PHP 8.3 or newer, HTTPS and InnoDB. The verification matrix covers PHP 8.3, 8.4 and 8.5 on MariaDB 10.11 and includes a MySQL 8.4 job on PHP 8.5. Action Scheduler 4.2.0 is included and shares its runtime with any compatible copy already loaded. WooCommerce 11.1 or newer is optional.
 
 == Module guide ==
 

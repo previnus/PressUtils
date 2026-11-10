@@ -1,6 +1,22 @@
 # PressUtils release validation
 
-The source review began on the local 0.1.0 snapshot. The 0.1.1 tag includes the initial fixes. The 0.2.0 candidate adds fixes for order privacy and delegated notes. The workflow tests a packaged install on PHP 8.3, 8.4 and 8.5.
+The source review began on the local 0.1.0 snapshot. The 0.1.1 tag includes the initial fixes. The 0.2.0 candidate adds fixes for order privacy and delegated notes. The 0.2.1 verification uses disposable WordPress sites, synthetic order data and a fixture HTTPS receiver. It qualifies the distributable separately from any site's deployment.
+
+## 0.2.1 release verification
+
+| Area | Evidence and scope |
+| --- | --- |
+| Runtime | The packaged plugin is tested on WordPress 7.0.8 and 7.1.4 across PHP 8.3, 8.4 and 8.5. The matrix uses MariaDB 10.11.15 and MySQL 8.4.13. WooCommerce 11.1.2 exercises legacy order storage and 11.2.2 exercises HPOS without compatibility sync. |
+| Privacy | A second database connection holds the CRM capture lock during WooCommerce order anonymization. The next paused sweep clears the order bodies and retry marker. Fresh send checks still guard the connection. |
+| Browser and HTTP | Chromium tests keyboard access to login, emergency pause, notes and audit export. HTTP tests cover unauthorized requests, nonces, stale settings revisions and 404 redirect behavior. |
+| Passive and queue performance | The harness compares identical warmed public requests with the package off and on, both with and without Redis. The queue fixture holds 10,000 encrypted rows and measures a 60-delivery eligible burst. Its queue-age result projects a one-minute runner cadence from measured sweeps. |
+| Receiver | The isolated runner uses actual DNS and certificate-verified HTTPS with a temporary CA. The receiver checks signing, deduplication, rejection of an invalid signature, and recovery from HTTP 503. Private DNS results and a wrong certificate hostname are checked separately. |
+| Recovery | A disposable multisite passed new-site provisioning, policy narrowing and data-isolation tests. A separate database restore preserved the schema and decryptability with a matching keyring and the host outbound override enabled. |
+| Source and supply chain | PHPStan level 0 checks first-party code with WordPress and WooCommerce stubs. Targeted WordPress Coding Standards security diagnostics were reviewed against the shared nonce and SQL wrappers and the output types. Release assets include a reproducible ZIP, checksum and schema-validated CycloneDX SBOM. The tagged workflow generates GitHub provenance and SBOM attestations for the ZIP. |
+
+[GitHub verification runs](https://github.com/previnus/PressUtils/actions/workflows/verify.yml) · [Fixture instructions](../tests/README.md) · [Installation and verification guide](USER-GUIDE.md)
+
+The disposable acceptance run passed all six matrix jobs. Across 75 measured public requests per phase, the warm Redis baseline was 41.37 ms at p95 and the installed ZIP was 41.62 ms. The ZIP added one SQL query and made zero synchronous WordPress HTTP calls on that path. Without Redis, it added two queries and 1.15 ms. The eligible queue burst had a projected p95 delay of 120.61 seconds at one sweep per minute. These figures describe the fixture and its configured traffic. [Acceptance run](https://github.com/previnus/PressUtils/actions/runs/42783397232)
 
 ## 0.2.0 follow-up
 
@@ -37,4 +53,5 @@ The source review began on the local 0.1.0 snapshot. The 0.1.1 tag includes the 
 - Concurrent webhook captures can be dropped if the site CRM lock remains busy beyond its wait budget. Watch the dropped-capture count in Overview. Receiver-side deduplication is required because retries can follow an uncertain result.
 - Public clients can skew anonymous 404 counts or exhaust the daily recording budget. Use host-level traffic limits where appropriate. Saturated totals are incomplete.
 - Commerce payloads contain operational order IDs. The receiver can correlate them with customer records and needs its own erasure workflow for deliveries it has already received.
-- Complete REST writes, Checkout Blocks shipping support, live provider acceptance, load tests, and broader WordPress and database compatibility coverage remain outside this release.
+- The shipping notice supports classic WooCommerce templates. A full checkout acceptance matrix, including Checkout Blocks shipping, coupons and refunds, remains open. The REST surface covers the endpoints in the user guide.
+- Receiver testing uses the disposable HTTPS fixture. n8n and GoHighLevel acceptance and a host-specific production pilot remain open. Test the target host's cron, peak 404 traffic, proxy, cache invalidation and coexistence with its theme and plugins before rollout.
