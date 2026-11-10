@@ -1,10 +1,11 @@
 """Compare server-side timing and SQL counts on a warmed loopback fixture."""
 
+from base64 import b64decode
 import json
 import math
 from pathlib import Path
 import sys
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 
 phase, output, url = sys.argv[1:]
@@ -28,5 +29,8 @@ elif phase in ('packaged', 'uncached'):
     baseline = json.loads(path.read_text(encoding='utf-8'))
     assert result['http_calls'] == baseline['http_calls'] == 0, 'Passive path attempted HTTP'
     if phase == 'packaged':
+        if result['sql_queries'] - baseline['sql_queries'] > 2:
+            with urlopen(Request(url, headers={'X-Fixture-Profile': '1'}), timeout=15) as response:
+                print('SQL callers:', b64decode(response.headers['X-Fixture-SQL-Callers']).decode())
         assert result['sql_queries'] - baseline['sql_queries'] <= 2, 'Exceeded passive SQL budget'
         assert result['p95_ms'] - baseline['p95_ms'] < 10, 'Exceeded passive p95 budget'

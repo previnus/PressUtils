@@ -40,4 +40,5 @@ with sync_playwright() as playwright:
     with page.expect_download() as download:
         page.get_by_role('button', name='Download filtered JSON Lines', exact=False).press('Enter')
     assert download.value.suggested_filename.endswith('.jsonl')
+    browser.close()
     print('PASS Chromium keyboard login, emergency pause, notes and audit export')

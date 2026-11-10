@@ -10,7 +10,9 @@ final class Queue
 
     public static function hooks(): void
     {
-        add_action('action_scheduler_init', [self::class, 'ensure']);
+        if (is_admin() || wp_doing_cron() || (defined('WP_CLI') && WP_CLI)) {
+            add_action('action_scheduler_init', [self::class, 'ensure']);
+        }
         add_action('action_scheduler_ensure_recurring_actions', [self::class, 'ensure']);
         add_action(self::HOOK, [self::class, 'sweep']);
         // This shared runner can forward the current admin session in its loopback.

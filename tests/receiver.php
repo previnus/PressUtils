@@ -29,7 +29,9 @@ Queue::sweep();
 $table = Db::table('webhook_deliveries');
 $row = Db::row('SELECT * FROM %i WHERE destination_id = %d', $table, $id);
 $assert($row['state'] === 'retry_wait' && (int) $row['last_http_status'] === 503
-    && strtotime($row['next_attempt_at'] . ' UTC') >= time() + 85, 'Real HTTP 503 schedules a retry using Retry-After');
+    && strtotime($row['next_attempt_at'] . ' UTC') >= time() + 85,
+    sprintf('Real HTTP 503 schedules a retry using Retry-After (state %s, code %s, status %d, delay %ds)',
+        $row['state'], $row['last_code'], $row['last_http_status'], strtotime($row['next_attempt_at'] . ' UTC') - time()));
 $body = Secrets::open('delivery', $row['delivery_uuid'], $row['body_key_id'], $row['body_ciphertext']);
 $timestamp = (string) time();
 $signature = hash_hmac('sha256', $timestamp . "\n" . $row['delivery_uuid'] . "\n" . $body, $secret);
