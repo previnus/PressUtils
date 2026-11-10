@@ -110,7 +110,25 @@ $cart->empty_cart();
 $zone->delete(true);
 
 require_once WC_ABSPATH . 'includes/class-wc-privacy-erasers.php';
-WC_Privacy_Erasers::remove_order_personal_data($order);
+$connection = new wpdb(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST);
+$lock = 'wpus_' . substr(hash('sha256', DB_NAME . '|' . Db::table('crm')), 0, 56);
+$assert((int) $connection->get_var($connection->prepare('SELECT GET_LOCK(%s, 0)', $lock)) === 1,
+    'Another connection holds the capture lock');
+try {
+    WC_Privacy_Erasers::remove_order_personal_data($order);
+    $assert((int) Db::value('SELECT COUNT(*) FROM %i WHERE source_type = %s AND object_id = %d',
+        Db::table('event_sources'), 'woocommerce.order_erasure', $order->get_id()) === 1,
+        'Privacy erasure persists a retry when capture is busy');
+} finally {
+    $connection->get_var($connection->prepare('SELECT RELEASE_LOCK(%s)', $lock));
+    $connection->close();
+}
+update_option('wpus_outbound_paused', true, false);
+Queue::sweep();
+update_option('wpus_outbound_paused', false, false);
+$assert((int) Db::value('SELECT COUNT(*) FROM %i WHERE source_type = %s AND object_id = %d',
+    Db::table('event_sources'), 'woocommerce.order_erasure', $order->get_id()) === 0,
+    'The paused runner retries erasure and clears the marker');
 $afterErase = Db::rows(
     'SELECT e.event_type, e.order_id, d.state, d.body_ciphertext FROM %i d JOIN %i e ON e.id = d.event_id
      WHERE d.destination_id = %d AND d.is_test = 0 ORDER BY d.id', Db::table('webhook_deliveries'), Db::table('webhook_events'), $id

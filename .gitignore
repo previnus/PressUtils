@@ -1,5 +1,6 @@
 /*.zip
 /*.zip.sha256
+/*.cdx.json
 /wordpress-utility-suite-architecture.md
 __pycache__/
 *.pyc

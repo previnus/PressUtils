@@ -7,29 +7,38 @@ permissions:
 
 jobs:
   wordpress:
-    name: WordPress ${{ matrix.wordpress }} / PHP ${{ matrix.php }}
+    name: WordPress ${{ matrix.wordpress }} / PHP ${{ matrix.php }} / ${{ matrix.database || 'MariaDB' }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         wordpress: ['7.0.8', '7.1.4']
         php: ['8.3', '8.4', '8.5']
+        include:
+          - wordpress: '7.1.4'
+            php: '8.5'
+            database: MySQL
+            extra: true
     services:
-      mariadb:
-        image: mariadb:10.11.15
+      database:
+        image: ${{ matrix.database == 'MySQL' && 'mysql:8.4.13' || 'mariadb:10.11.15' }}
         env:
           MARIADB_DATABASE: wpus_test
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+          MYSQL_DATABASE: wpus_test
+          MYSQL_ALLOW_EMPTY_PASSWORD: '1'
+          MYSQL_ROOT_HOST: '%'
         ports:
           - 33316:3306
         options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=15
     env:
       WPUS_WORDPRESS: ${{ matrix.wordpress }}
       WPUS_HPOS: ${{ matrix.wordpress == '7.1.4' && 'yes' || 'no' }}
+      WPUS_WOO: ${{ matrix.wordpress == '7.1.4' && '11.2.2' || '11.1.2' }}
       WPUS_DB_PORT: '33316'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -52,6 +61,7 @@ jobs:
       - name: Exercise the packaged plugin
         run: |
           wpus_fixture=$(mktemp -d)
+          printf 'WPUS_FIXTURE=%s\n' "$wpus_fixture" >> "$GITHUB_ENV"
           curl --fail --silent --show-error --location "https://wordpress.org/wordpress-$WPUS_WORDPRESS.zip" -o "$wpus_fixture/wp.zip"
           curl --fail --silent --show-error --location https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar -o "$wpus_fixture/wp-cli.phar"
           unzip -q "$wpus_fixture/wp.zip" -d "$wpus_fixture"
@@ -66,7 +76,19 @@ jobs:
           wpus_wp config set WPUS_WEBHOOK_ORIGINS "['https://example.com']" --raw --type=constant --quiet
           wpus_wp plugin install "$GITHUB_WORKSPACE"/wp-utility-suite-*.zip --activate
           wpus_wp eval-file "$GITHUB_WORKSPACE/tests/integration.php"
-          wpus_wp plugin install https://downloads.wordpress.org/plugin/woocommerce.11.2.2.zip --activate
+          wpus_wp plugin install "https://downloads.wordpress.org/plugin/woocommerce.$WPUS_WOO.zip" --activate
           wpus_wp option update woocommerce_custom_orders_table_enabled "$WPUS_HPOS"
           wpus_wp option update woocommerce_custom_orders_table_data_sync_enabled no
           wpus_wp eval-file "$GITHUB_WORKSPACE/tests/commerce.php"
+      - name: Install acceptance test dependencies
+        if: matrix.extra
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends dnsmasq-base
+          python3 -m venv "$RUNNER_TEMP/wpus-browser"
+          "$RUNNER_TEMP/wpus-browser/bin/pip" install 'playwright==1.64.1'
+          "$RUNNER_TEMP/wpus-browser/bin/python" -m playwright install --with-deps chromium
+          printf '%s\n' "$RUNNER_TEMP/wpus-browser/bin" >> "$GITHUB_PATH"
+      - name: Exercise browser, passive performance, and real TLS receiver
+        if: matrix.extra
+        run: bash tests/acceptance.sh

@@ -1,6 +1,7 @@
 """Build a reproducible WordPress plugin archive and its SHA-256 checksum."""
 
 from hashlib import sha256
+import json
 from pathlib import Path
 import re
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
@@ -42,4 +43,29 @@ with ZipFile(ARCHIVE) as output:
 
 checksum = sha256(ARCHIVE.read_bytes()).hexdigest()
 ARCHIVE.with_suffix(".zip.sha256").write_text(f"{checksum}  {ARCHIVE.name}\n", encoding="ascii", newline="\n")
+
+scheduler = REQUIRED[-1]
+vendor_entries = {path.name for path in scheduler.parent.parent.iterdir()}
+if vendor_entries != {"action-scheduler"}:
+    raise ValueError("Update the SBOM inventory for the bundled vendor entries")
+scheduler_version = re.search(r"(?m)^ \* Version: (\d+\.\d+\.\d+)$", scheduler.read_text(encoding="utf-8")).group(1)
+plugin_ref = f"pkg:github/previnus/PressUtils@v{VERSION}"
+scheduler_ref = f"pkg:github/woocommerce/action-scheduler@{scheduler_version}"
+bom = {
+    "$schema": "https://cyclonedx.org/schema/bom-1.6.schema.json",
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.6",
+    "version": 1,
+    "metadata": {"component": {
+        "type": "application", "bom-ref": plugin_ref, "name": "PressUtils", "version": VERSION,
+        "purl": plugin_ref, "hashes": [{"alg": "SHA-256", "content": checksum}],
+        "licenses": [{"license": {"id": "GPL-3.0-or-later"}}],
+    }},
+    "components": [{
+        "type": "library", "bom-ref": scheduler_ref, "name": "Action Scheduler", "version": scheduler_version,
+        "purl": scheduler_ref, "licenses": [{"license": {"id": "GPL-3.0-or-later"}}],
+    }],
+    "dependencies": [{"ref": plugin_ref, "dependsOn": [scheduler_ref]}, {"ref": scheduler_ref, "dependsOn": []}],
+}
+ARCHIVE.with_suffix(".cdx.json").write_text(json.dumps(bom, indent=2) + "\n", encoding="utf-8", newline="\n")
 print(f"{ARCHIVE.name}  {checksum}")

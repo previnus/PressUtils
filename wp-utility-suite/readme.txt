@@ -2,7 +2,7 @@
 Requires at least: 7.0
 Tested up to: 7.1.4
 Requires PHP: 8.3
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -73,6 +73,11 @@ This is a release candidate. WooCommerce shipping uses classic templates. Before
 Action Scheduler is bundled from the upstream 4.2.0 tag. Its production runtime files and notices are under vendor/action-scheduler. The upstream source ZIP is https://codeload.github.com/woocommerce/action-scheduler/zip/refs/tags/4.2.0 with SHA-256 ab3574206071902aa81e9a7ba50a72997ac377798a18431da4ae962d573ef643.
 
 == Changelog ==
+
+= 0.2.1 =
+
+* Retry WooCommerce order erasure when the capture lock is busy, including while outbound delivery is paused.
+* Process up to 20 webhook deliveries per sweep and stop starting new attempts after 12 seconds.
 
 = 0.2.0 =
 * Cancel retained order webhooks on WooCommerce erasure and recheck anonymization before sending.

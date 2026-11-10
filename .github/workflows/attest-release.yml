@@ -1,0 +1,44 @@
+name: Attest PressUtils release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build and verify archive
+        id: build
+        run: |
+          python3 tools/package.py
+          test -f "wp-utility-suite-${GITHUB_REF_NAME#v}.zip"
+          sha256sum --check wp-utility-suite-*.zip.sha256
+          printf 'archive=wp-utility-suite-%s.zip\n' "${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          printf 'sbom=wp-utility-suite-%s.cdx.json\n' "${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Attest build provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: ${{ steps.build.outputs.archive }}
+      - name: Attest the software bill of materials
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: ${{ steps.build.outputs.archive }}
+          sbom-path: ${{ steps.build.outputs.sbom }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pressutils-release
+          if-no-files-found: error
+          path: |
+            ${{ steps.build.outputs.archive }}
+            ${{ steps.build.outputs.archive }}.sha256
+            ${{ steps.build.outputs.sbom }}

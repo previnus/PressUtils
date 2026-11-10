@@ -6,6 +6,7 @@ defined('ABSPATH') || exit;
 final class Crm
 {
     public const ORDER_EVENT = 'woocommerce.order_status_changed';
+    private const ORDER_ERASURE = 'woocommerce.order_erasure';
 
     public const EVENTS = [
         'content.published' => ['content_id', 'content_type'],
@@ -288,22 +289,39 @@ final class Crm
         if ($id < 1 || !Lifecycle::ready()) {
             return;
         }
+        if (!self::clearOrder($id)) {
+            if (Db::query(
+                'INSERT INTO %i (source_type, object_id, state_code, observed_at) VALUES (%s, %d, %s, %s)
+                 ON DUPLICATE KEY UPDATE object_id = object_id',
+                Db::table('event_sources'), self::ORDER_ERASURE, $id, 'pending', Db::utc()
+            ) === false) {
+                Audit::record('commerce.erasure_failed', 'webhook', null, null, [], 0);
+                return;
+            }
+            Audit::record('commerce.erasure_deferred', 'webhook', null, null, [], 0);
+        }
+    }
+
+    private static function clearOrder(int $id, int $wait = 1): bool
+    {
         $events = Db::table('webhook_events');
         $deliveries = Db::table('webhook_deliveries');
-        $erased = Db::locked('crm', static fn () => Db::transaction(static function () use ($id, $events, $deliveries): bool {
+        return Db::locked('crm', static fn () => Db::transaction(static function () use ($id, $events, $deliveries): bool {
             return Db::query(
                 "UPDATE %i d JOIN %i e ON e.id = d.event_id SET d.state = 'cancelled',
                  d.body_ciphertext = NULL, d.body_key_id = NULL, d.lease_token = NULL, d.lease_until = NULL, d.last_code = 'order_erased'
                  WHERE e.order_id = %d AND e.event_type = %s AND d.body_ciphertext IS NOT NULL",
                 $deliveries, $events, $id, self::ORDER_EVENT
+            ) !== false && Db::query(
+                "UPDATE %i a JOIN %i d ON a.delivery_id = d.id AND a.attempt_no = d.attempt_count
+                 JOIN %i e ON d.event_id = e.id SET a.result = 'order_erased', a.finished_at = %s
+                 WHERE e.order_id = %d AND e.event_type = %s AND a.result = 'started'",
+                Db::table('webhook_attempts'), $deliveries, $events, Db::utc(), $id, self::ORDER_EVENT
             ) !== false && Db::query('UPDATE %i SET order_id = NULL WHERE order_id = %d AND event_type = %s',
                 $events, $id, self::ORDER_EVENT) !== false
-                && Db::query('DELETE FROM %i WHERE source_type = %s AND object_id = %d',
-                    Db::table('event_sources'), self::ORDER_EVENT, $id) !== false;
-        }), 1);
-        if (!$erased) {
-            Audit::record('commerce.erasure_deferred', 'webhook', null, null, [], 0);
-        }
+                && Db::query('DELETE FROM %i WHERE source_type IN (%s, %s) AND object_id = %d',
+                    Db::table('event_sources'), self::ORDER_EVENT, self::ORDER_ERASURE, $id) !== false;
+        }), $wait);
     }
 
     public static function redrive(int $id): string
@@ -329,6 +347,12 @@ final class Crm
 
     public static function sweep(): void
     {
+        foreach (Db::rows('SELECT object_id FROM %i WHERE source_type = %s ORDER BY object_id LIMIT 20',
+            Db::table('event_sources'), self::ORDER_ERASURE) as $order) {
+            if (!self::clearOrder((int) $order['object_id'], 0)) {
+                break;
+            }
+        }
         $deliveries = Db::table('webhook_deliveries');
         $now = Db::utc();
         $cutoff = Db::utc(time() - WEEK_IN_SECONDS);
@@ -343,7 +367,8 @@ final class Crm
         $capture = Policy::feature('crm', 'capture');
         $orders = (int) self::sourceEnabled(self::ORDER_EVENT);
         $stock = (int) self::sourceEnabled('woocommerce.stock_below_threshold');
-        for ($batch = 0; $batch < 2; $batch++) {
+        $deadline = hrtime(true) + 12_000_000_000;
+        for ($batch = 0; $batch < 20 && hrtime(true) < $deadline; $batch++) {
             $row = Db::locked('crm', static fn () => Db::transaction(static function () use ($deliveries, $now, $cutoff, $capture, $orders, $stock) {
                 $row = Db::row(
                     "SELECT d.*, e.event_type, e.order_id FROM %i d JOIN %i t ON t.id = d.destination_id JOIN %i e ON e.id = d.event_id
