@@ -44,9 +44,8 @@ redis=$!
 wp config set WP_REDIS_PORT 16379 --raw --type=constant --quiet
 wp plugin install https://downloads.wordpress.org/plugin/redis-cache.3.0.0.zip --activate
 wp redis enable
-wp redis status
-wp eval 'if (!wp_using_ext_object_cache() || !wp_cache_set("fixture_probe", 1)) { exit(1); }'
-wp eval 'if (wp_cache_get("fixture_probe") !== 1) { exit(1); }'
+wp eval 'if (!wp_using_ext_object_cache() || !wp_cache_set("probe", "ready", "wpus_fixture", 60)) { WP_CLI::error("Persistent fixture cache is unavailable."); }'
+wp eval 'if (wp_cache_get("probe", "wpus_fixture") !== "ready") { WP_CLI::error("Fixture cache did not persist across processes."); }'
 wp plugin deactivate wp-utility-suite
 python3 tests/passive-benchmark.py baseline "$fixture/warm.json" "$WPUS_SMOKE_URL/"
 wp plugin activate wp-utility-suite
