@@ -28,8 +28,10 @@ with sync_playwright() as playwright:
 
     page.goto(overview + '&tab=admin_tools')
     marker = 'Chromium fixture ' + uuid.uuid4().hex[:8]
-    page.get_by_label('Title', exact=True).first.fill(marker)
-    page.get_by_label('Note', exact=True).first.fill('Text saved with a keyboard.')
+    page.get_by_text('Add a note', exact=True).press('Enter')
+    note = page.locator('details[open]')
+    note.get_by_label('Title', exact=True).fill(marker)
+    note.get_by_label('Note', exact=True).fill('Text saved with a keyboard.')
     page.get_by_role('button', name='Create note').press('Enter')
     expect(page).to_have_url(re.compile('wpus_status=saved'))
     expect(page.get_by_text(marker, exact=False).first).to_be_visible()
