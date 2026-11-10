@@ -4,6 +4,11 @@ set -euo pipefail
 fixture=$WPUS_FIXTURE
 root=$fixture/wordpress
 wp() { php "$fixture/wp-cli.phar" --path="$root" "$@"; }
+finish_scheduler_migration() {
+  if ! wp eval 'exit(ActionScheduler_DataController::is_migration_complete() ? 0 : 1);'; then
+    wp action-scheduler migrate
+  fi
+}
 
 export WPUS_SMOKE_URL=http://127.0.0.1:38142
 export WPUS_SMOKE_USER=wpusadmin
@@ -34,9 +39,7 @@ curl --fail --silent --retry 5 --retry-connrefused "$WPUS_SMOKE_URL" > /dev/null
 wp plugin deactivate wp-utility-suite
 python3 tests/passive-benchmark.py baseline "$fixture/uncached.json" "$WPUS_SMOKE_URL/"
 wp plugin activate wp-utility-suite
-if ! wp eval 'exit(ActionScheduler_DataController::is_migration_complete() ? 0 : 1);'; then
-  wp action-scheduler migrate
-fi
+finish_scheduler_migration
 python3 tests/passive-benchmark.py uncached "$fixture/uncached.json" "$WPUS_SMOKE_URL/"
 
 redis-server --bind 127.0.0.1 --port 16379 --save '' --appendonly no > "$fixture/redis.log" 2>&1 &
@@ -49,6 +52,7 @@ wp eval 'if (wp_cache_get("probe", "wpus_fixture") !== "ready") { WP_CLI::error(
 wp plugin deactivate wp-utility-suite
 python3 tests/passive-benchmark.py baseline "$fixture/warm.json" "$WPUS_SMOKE_URL/"
 wp plugin activate wp-utility-suite
+finish_scheduler_migration
 failed=0
 python3 tests/passive-benchmark.py packaged "$fixture/warm.json" "$WPUS_SMOKE_URL/" || failed=1
 python3 tests/http-smoke.py || failed=1
@@ -66,12 +70,13 @@ openssl req -newkey rsa:2048 -nodes -subj '/CN=receiver.example.test' -keyout "$
 printf 'subjectAltName=DNS:receiver.example.test\nextendedKeyUsage=serverAuth\n' > "$fixture/server.ext"
 openssl x509 -req -in "$fixture/server.csr" -CA "$fixture/ca.crt" -CAkey "$fixture/ca.key" -CAcreateserial \
   -days 1 -extfile "$fixture/server.ext" -out "$fixture/server.crt"
-sudo dnsmasq --no-resolv --no-hosts --bind-interfaces --listen-address=127.0.0.1 \
+sudo dnsmasq --no-resolv --no-hosts --local=/example.test/ --bind-interfaces --listen-address=127.0.0.1 \
   --pid-file="$fixture/dnsmasq.pid" --host-record=receiver.example.test,badcert.example.test,93.184.215.20 \
   --host-record=private.example.test,127.0.0.1
 printf 'nameserver 127.0.0.1\noptions timeout:1 attempts:1\n' > "$fixture/resolv.conf"
 sudo mount --bind "$fixture/resolv.conf" /etc/resolv.conf
 resolver_mounted=1
+php -r '$records = dns_get_record("receiver.example.test.", DNS_A | DNS_AAAA); if (($records[0]["ip"] ?? null) !== "93.184.215.20") { fwrite(STDERR, "Fixture DNS returned no usable records: " . json_encode($records) . "\n"); exit(1); }'
 
 export WPUS_RECEIVER_KEY
 WPUS_RECEIVER_KEY=$(openssl rand -hex 32)
