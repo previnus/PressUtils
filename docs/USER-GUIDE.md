@@ -125,8 +125,8 @@ Local auditing and diagnostics are available after activation. Alerts, HTTP timi
 Download the ZIP and its matching **.zip.sha256** file into the same directory. Check the digest and verify GitHub's signed build provenance against this repository. [GitHub's artifact verification instructions](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
 
 ~~~sh
-sha256sum --check wp-utility-suite-0.2.1.zip.sha256
-gh attestation verify wp-utility-suite-0.2.1.zip --repo previnus/PressUtils --source-ref refs/tags/v0.2.1
+sha256sum --check wp-utility-suite-0.2.2.zip.sha256
+gh attestation verify wp-utility-suite-0.2.2.zip --repo previnus/PressUtils --source-ref refs/tags/v0.2.2
 ~~~
 
 The **.cdx.json** asset lists the packaged components. Replace the version in these commands with the release you downloaded. Use release tags that include attestations.

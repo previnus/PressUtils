@@ -2,7 +2,7 @@
 Requires at least: 7.0
 Tested up to: 7.1.4
 Requires PHP: 8.3
-Stable tag: 0.2.1
+Stable tag: 0.2.2
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -11,11 +11,11 @@ Site auditing, performance diagnostics, private admin tools, monitoring, and opt
 Author: Previn Kalisetty Appadu <hi@previn.me>
 Author website: https://previn.me
 
-Step-by-step user guide: https://github.com/previnus/PressUtils/blob/v0.2.1/docs/USER-GUIDE.md
+Step-by-step user guide: https://github.com/previnus/PressUtils/blob/v0.2.2/docs/USER-GUIDE.md
 
 == Installation ==
 
-1. Download wp-utility-suite-0.2.1.zip and its SHA-256 file from https://github.com/previnus/PressUtils/releases/tag/v0.2.1. Compare the archive digest with the checksum file.
+1. Download wp-utility-suite-0.2.2.zip and its SHA-256 file from https://github.com/previnus/PressUtils/releases/tag/v0.2.2. Compare the archive digest with the checksum file.
 2. Open Plugins → Add New Plugin → Upload Plugin, choose the named plugin ZIP, select Install Now, then activate WP Utility Suite.
 3. Open Utility Suite → Overview and confirm the six module statuses and scheduler health. On multisite, use Network Admin → Utility Suite to check site setup and apply network-wide restrictions.
 4. Choose the desired Module settings, save and test each feature. Local audit capture and diagnostics are available immediately. Features that send traffic or change site behavior are individually opt-in.
@@ -74,10 +74,11 @@ Action Scheduler is bundled from the upstream 4.2.0 tag. Its production runtime 
 
 == Changelog ==
 
-= 0.2.1 =
+= 0.2.2 =
 
 * Retry WooCommerce order erasure when the capture lock is busy, including while outbound delivery is paused.
 * Process up to 20 webhook deliveries per sweep and stop starting new attempts after 12 seconds.
+* Repair the recurring queue schedule from admin, cron and WP-CLI requests.
 
 = 0.2.0 =
 * Cancel retained order webhooks on WooCommerce erasure and recheck anonymization before sending.

@@ -4,6 +4,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
+from uuid import NAMESPACE_URL, uuid5
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
@@ -58,6 +59,7 @@ bom = {
     "$schema": "https://cyclonedx.org/schema/bom-1.6.schema.json",
     "bomFormat": "CycloneDX",
     "specVersion": "1.6",
+    "serialNumber": uuid5(NAMESPACE_URL, f"https://github.com/previnus/PressUtils#{checksum}").urn,
     "version": 1,
     "metadata": {"component": {
         "type": "application", "bom-ref": plugin_ref, "name": "PressUtils", "version": VERSION,

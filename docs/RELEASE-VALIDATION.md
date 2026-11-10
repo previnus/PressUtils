@@ -1,8 +1,8 @@
 # PressUtils release validation
 
-The source review began on the local 0.1.0 snapshot. The 0.1.1 tag includes the initial fixes. The 0.2.0 candidate adds fixes for order privacy and delegated notes. The 0.2.1 verification uses disposable WordPress sites, synthetic order data and a fixture HTTPS receiver. It qualifies the distributable separately from any site's deployment.
+The source review began on the local 0.1.0 snapshot. The 0.1.1 tag includes the initial fixes. The 0.2.0 candidate adds fixes for order privacy and delegated notes. The 0.2.2 verification uses disposable WordPress sites, synthetic order data and a fixture HTTPS receiver. It qualifies the distributable separately from any site's deployment. The 0.2.1 build tag was superseded before publication when GitHub required a serial number in the SBOM.
 
-## 0.2.1 release verification
+## 0.2.2 release verification
 
 | Area | Evidence and scope |
 | --- | --- |
