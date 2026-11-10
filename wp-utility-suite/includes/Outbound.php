@@ -130,7 +130,7 @@ final class Outbound
                     $value = trim(substr($line, 12));
                     if (ctype_digit($value) && strlen($value) <= 7) {
                         $retry = (int) $value;
-                    } elseif (preg_match('/\A[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT\z/D', $value)) {
+                    } elseif (preg_match('/\A[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT\z/D', $value) === 1) {
                         $when = strtotime($value);
                         $retry = $when ? max(0, $when - time()) : null;
                     }

@@ -82,6 +82,24 @@ $assert(Notes::list()['items'] === [] && Notes::remove((int) $note['id'], 1) ===
 $assert($patch('security', ['logins' => false]) === 'denied', 'Unprivileged user cannot change settings');
 wp_set_current_user($admin->ID);
 
+$visibleNote = Db::insert('admin_notes', [
+    'title' => 'Unlinked pagination fixture', 'body_text' => 'Visible', 'created_at' => Db::utc(), 'updated_at' => Db::utc(),
+]);
+$hidden = [];
+for ($index = 0; $index < 51; $index++) {
+    $hidden[] = Db::insert('admin_notes', [
+        'post_id' => $post, 'title' => 'Restricted pagination fixture', 'body_text' => 'Restricted',
+        'created_at' => Db::utc(), 'updated_at' => Db::utc(),
+    ]);
+}
+get_userdata($subscriber)->add_cap('wpus_view_notes');
+wp_set_current_user($subscriber);
+$page = Notes::list();
+$visibleIds = array_map('intval', array_column($page['items'], 'id'));
+$assert(in_array($visibleNote, $visibleIds, true) && !array_intersect($hidden, $visibleIds)
+    && (!$page['next'] || in_array($page['next'], $visibleIds, true)), 'Delegated note pagination never returns hidden record IDs');
+wp_set_current_user($admin->ID);
+
 $expiry = static function (int $post) use ($assert): void {
     $when = wp_date('Y-m-d\TH:i', time() + 1800, wp_timezone());
     $assert(Operations::scheduleExpiry($post, $when) === 'queued', 'Expiration is queued');

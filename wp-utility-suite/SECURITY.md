@@ -8,3 +8,9 @@ WPUS trusts the WordPress runtime, installed PHP code, host configuration and th
 - **Ingestion.** Admin forms use bounded scalar fields and explicit validation. Table names are derived from trusted WordPress configuration and fixed suffixes. Output is escaped for its context. Redirect rules use a conservative same-site path grammar, reject chains and use WordPress's safe redirect API.
 - **Outbound traffic.** Outbound features start off and are subject to an operator stop. Remote endpoints require HTTPS, public DNS results, connection pinning, explicit host approval and bounded requests. Keep secrets out of WordPress settings and diagnostics.
 - **Abuse cases.** Test stale revisions, missing nonces, unauthorized direct URLs, multisite ID overlap, stored markup, redirect loops, revoked expiry permissions and exhausted 404 budgets. Treat a changed post as a skip. A core write from another plugin can still race the final post update.
+
+## Order erasure and notes pagination
+
+WooCommerce decides when an order has been anonymized. PressUtils uses the current site's WooCommerce CRUD API to check the order at capture and before sending. The site-local outbox stores only the order ID as its cancellation reference. The encrypted body contains the order ID and status codes. It carries no billing email, address or payment details. When WooCommerce anonymizes an order, PressUtils cancels its retained bodies and clears its linkage and source marker. The migration cancels old order bodies that have no cancellation reference. Requests already sent and data stored by a receiver follow that receiver's privacy process.
+
+The notes collection checks each linked post with WordPress's edit permission before choosing any cursor that will be returned. The scan is bounded so a delegated request cannot walk an arbitrarily large store. The caller receives cursors derived from visible notes.

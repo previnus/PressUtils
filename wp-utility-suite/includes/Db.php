@@ -79,10 +79,10 @@ final class Db
         }
     }
 
-    public static function locked(string $operation, callable $run): mixed
+    public static function locked(string $operation, callable $run, int $wait = 0): mixed
     {
         $key = 'wpus_' . substr(hash('sha256', DB_NAME . '|' . self::table($operation)), 0, 56);
-        if ((int) self::value('SELECT GET_LOCK(%s, 0)', $key) !== 1) {
+        if ((int) self::value('SELECT GET_LOCK(%s, %d)', $key, $wait) !== 1) {
             return false;
         }
         try {

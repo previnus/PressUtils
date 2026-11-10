@@ -7,6 +7,9 @@ final class Privacy
 {
     public static function hooks(): void
     {
+        add_action('woocommerce_privacy_remove_order_personal_data', static function (\WC_Order $order): void {
+            Crm::eraseOrder($order->get_id());
+        });
         add_filter('wp_privacy_personal_data_exporters', static function (array $callbacks): array {
             $callbacks['wp-utility-suite'] = ['exporter_friendly_name' => 'WP Utility Suite', 'callback' => [self::class, 'export']];
             return $callbacks;

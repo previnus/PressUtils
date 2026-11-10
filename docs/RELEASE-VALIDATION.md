@@ -1,6 +1,13 @@
-# PressUtils 0.1.1 release validation
+# PressUtils release validation
 
-The first public package is a staging prerelease. The source review began on the local 0.1.0 snapshot. The 0.1.1 tag includes fixes and regression coverage. No review or test suite can establish that a plugin is free of every bug or vulnerability.
+The source review began on the local 0.1.0 snapshot. The 0.1.1 tag includes the initial fixes. The 0.2.0 candidate adds fixes for order privacy and delegated notes. The workflow tests a packaged install on PHP 8.3, 8.4 and 8.5.
+
+## 0.2.0 follow-up
+
+- WooCommerce anonymization cancels pending and retained order delivery bodies and removes their local order references. Workers recheck anonymization before connecting. The upgrade from 0.1.1 clears older order bodies that have no erasure reference.
+- Notes pagination uses only accessible rows to construct its continuation. Each request examines at most 1,000 rows. In a large store with many restricted records, a delegated view can end at the scan limit.
+- CRM capture waits up to one second for a competing capture to finish before recording a drop. Payload retention, retry limits and receiver-side deduplication still apply.
+- The release package comes from a committed source snapshot. Its ZIP contains plugin code, vendor code and documentation. Deployment credentials and runtime data are supplied separately by the host.
 
 ## Changes from the audit
 
@@ -27,8 +34,7 @@ The first public package is a staging prerelease. The source review began on the
 ## Open limits
 
 - An HTTP request already in progress can finish after a pause. System DNS can block longer than the subsequent cURL timeout. The worker uses a separate lock for CRM, and a stalled DNS lookup still delays that worker.
-- Routine concurrent webhook captures can be dropped if the site CRM lock is busy. Watch the dropped-capture count in Overview. Receiver-side deduplication is required because retries can follow an uncertain result.
-- A delegated notes viewer can infer row IDs at pagination boundaries even when linked note contents and post identities are restricted. Grant notes access only to appropriate staff.
+- Concurrent webhook captures can be dropped if the site CRM lock remains busy beyond its wait budget. Watch the dropped-capture count in Overview. Receiver-side deduplication is required because retries can follow an uncertain result.
 - Public clients can skew anonymous 404 counts or exhaust the daily recording budget. Use host-level traffic limits where appropriate. Saturated totals are incomplete.
-- Commerce payloads contain operational order IDs. The receiver can correlate them with customer records. This preview's WordPress privacy callbacks redact local attribution but do not cancel queued commerce payloads by customer or erase data already delivered.
+- Commerce payloads contain operational order IDs. The receiver can correlate them with customer records and needs its own erasure workflow for deliveries it has already received.
 - Complete REST writes, Checkout Blocks shipping support, live provider acceptance, load tests, and broader WordPress and database compatibility coverage remain outside this release.

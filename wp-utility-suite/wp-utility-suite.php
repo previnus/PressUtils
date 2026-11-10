@@ -2,9 +2,9 @@
 /**
  * Plugin Name: WP Utility Suite
  * Description: Site auditing, performance diagnostics, admin tools, monitoring and optional integrations.
- * Version: 0.1.1
+ * Version: 0.2.0
  * Author: Previn Kalisetty Appadu
- * Author URI: mailto:hi@previn.me
+ * Author URI: https://previn.me
  * Author Email: hi@previn.me
  * Requires at least: 7.0
  * Requires PHP: 8.3
@@ -28,7 +28,7 @@ if (version_compare(PHP_VERSION, '8.3', '<') || version_compare($GLOBALS['wp_ver
 }
 
 define('WPUS_FILE', __FILE__);
-define('WPUS_VERSION', '0.1.1');
+define('WPUS_VERSION', '0.2.0');
 require_once __DIR__ . '/includes/autoload.php';
 
 if (is_readable(__DIR__ . '/vendor/action-scheduler/action-scheduler.php')) {

@@ -24,13 +24,28 @@ final class Commerce
     public static function order(int $id, string $previous, string $current): void
     {
         $order = wc_get_order($id);
-        if (!$order || $order->get_type() !== 'shop_order' || $previous === $current || $order->get_status() !== $current
+        if (!$order || $order->get_type() !== 'shop_order' || $order->get_meta('_anonymized') === 'yes'
+            || $previous === $current || $order->get_status() !== $current
             || !preg_match('/\A[a-z0-9_-]{1,24}\z/D', $previous) || !preg_match('/\A[a-z0-9_-]{1,24}\z/D', $current)) {
             return;
         }
-        Crm::observe('woocommerce.order_status_changed', $id, $current, [
+        Crm::observe(Crm::ORDER_EVENT, $id, $current, [
             'order_id' => $id, 'previous_status' => $previous, 'current_status' => $current,
         ], $previous);
+    }
+
+    public static function canSendOrder(int $id): bool
+    {
+        if ($id < 1 || !Policy::commerceReady()) {
+            return false;
+        }
+        $order = wc_get_order($id);
+        if (!$order || $order->get_type() !== 'shop_order') {
+            return false;
+        }
+        global $wpdb;
+        $order->read_meta_data(true);
+        return $wpdb->last_error === '' && $order->get_meta('_anonymized') !== 'yes';
     }
 
     public static function stock(\WC_Product $product): void

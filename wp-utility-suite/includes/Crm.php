@@ -5,9 +5,11 @@ defined('ABSPATH') || exit;
 
 final class Crm
 {
+    public const ORDER_EVENT = 'woocommerce.order_status_changed';
+
     public const EVENTS = [
         'content.published' => ['content_id', 'content_type'],
-        'woocommerce.order_status_changed' => ['order_id', 'previous_status', 'current_status'],
+        self::ORDER_EVENT => ['order_id', 'previous_status', 'current_status'],
         'woocommerce.stock_below_threshold' => ['product_id', 'stock_status'],
     ];
 
@@ -200,7 +202,7 @@ final class Crm
     {
         return match ($type) {
             'content.published', 'wpus.test' => true,
-            'woocommerce.order_status_changed' => Policy::feature('woocommerce', 'orders', true),
+            self::ORDER_EVENT => Policy::feature('woocommerce', 'orders', true),
             'woocommerce.stock_below_threshold' => Policy::feature('woocommerce', 'stock', true),
             default => false,
         };
@@ -212,6 +214,9 @@ final class Crm
             return;
         }
         $ok = Db::locked('crm', static fn () => Db::transaction(static function () use ($type, $object, $state, $data, $expectedPrevious) {
+            if ($type === self::ORDER_EVENT && !Commerce::canSendOrder($object)) {
+                return true;
+            }
             $table = Db::table('event_sources');
             $source = Db::row('SELECT state_code FROM %i WHERE source_type = %s AND object_id = %d', $table, $type, $object);
             if (($source['state_code'] ?? null) === $state) {
@@ -235,17 +240,20 @@ final class Crm
             if (!$destinations) {
                 return true;
             }
-            return self::capacity(count($destinations), $type) && self::persist($type, $data, $destinations, false);
-        }));
+            $orderId = $type === self::ORDER_EVENT ? $object : null;
+            return self::capacity(count($destinations), $type) && self::persist($type, $data, $destinations, false, $orderId);
+        }), 1);
         if (!$ok) {
             Audit::reserve('capture_' . gmdate('Ymd'), 1000000);
         }
     }
 
-    private static function persist(string $type, array $data, array $destinations, bool $test): bool
+    private static function persist(string $type, array $data, array $destinations, bool $test, ?int $orderId = null): bool
     {
         $eventUuid = wp_generate_uuid4();
-        $event = Db::insert('webhook_events', ['event_uuid' => $eventUuid, 'event_type' => $type, 'occurred_at' => Db::utc()]);
+        $event = Db::insert('webhook_events', [
+            'event_uuid' => $eventUuid, 'event_type' => $type, 'order_id' => $orderId, 'occurred_at' => Db::utc(),
+        ]);
         if (!$event) {
             return false;
         }
@@ -273,6 +281,29 @@ final class Crm
             }
         }
         return true;
+    }
+
+    public static function eraseOrder(int $id): void
+    {
+        if ($id < 1 || !Lifecycle::ready()) {
+            return;
+        }
+        $events = Db::table('webhook_events');
+        $deliveries = Db::table('webhook_deliveries');
+        $erased = Db::locked('crm', static fn () => Db::transaction(static function () use ($id, $events, $deliveries): bool {
+            return Db::query(
+                "UPDATE %i d JOIN %i e ON e.id = d.event_id SET d.state = 'cancelled',
+                 d.body_ciphertext = NULL, d.body_key_id = NULL, d.lease_token = NULL, d.lease_until = NULL, d.last_code = 'order_erased'
+                 WHERE e.order_id = %d AND e.event_type = %s AND d.body_ciphertext IS NOT NULL",
+                $deliveries, $events, $id, self::ORDER_EVENT
+            ) !== false && Db::query('UPDATE %i SET order_id = NULL WHERE order_id = %d AND event_type = %s',
+                $events, $id, self::ORDER_EVENT) !== false
+                && Db::query('DELETE FROM %i WHERE source_type = %s AND object_id = %d',
+                    Db::table('event_sources'), self::ORDER_EVENT, $id) !== false;
+        }), 1);
+        if (!$erased) {
+            Audit::record('commerce.erasure_deferred', 'webhook', null, null, [], 0);
+        }
     }
 
     public static function redrive(int $id): string
@@ -310,12 +341,12 @@ final class Crm
             return;
         }
         $capture = Policy::feature('crm', 'capture');
-        $orders = (int) self::sourceEnabled('woocommerce.order_status_changed');
+        $orders = (int) self::sourceEnabled(self::ORDER_EVENT);
         $stock = (int) self::sourceEnabled('woocommerce.stock_below_threshold');
         for ($batch = 0; $batch < 2; $batch++) {
             $row = Db::locked('crm', static fn () => Db::transaction(static function () use ($deliveries, $now, $cutoff, $capture, $orders, $stock) {
                 $row = Db::row(
-                    "SELECT d.* FROM %i d JOIN %i t ON t.id = d.destination_id JOIN %i e ON e.id = d.event_id
+                    "SELECT d.*, e.event_type, e.order_id FROM %i d JOIN %i t ON t.id = d.destination_id JOIN %i e ON e.id = d.event_id
                      WHERE d.created_at > %s AND d.body_ciphertext IS NOT NULL AND d.destination_generation = t.generation
                      AND ((d.is_test = 1 AND t.state <> 'revoked') OR (%d = 1 AND t.state = 'active' AND t.verified_generation = t.generation))
                      AND (d.is_test = 1 OR e.event_type = 'content.published'
@@ -369,6 +400,10 @@ final class Crm
 
     private static function send(array $row): void
     {
+        if ($row['event_type'] === self::ORDER_EVENT && !Commerce::canSendOrder((int) $row['order_id'])) {
+            self::finish($row, 'cancelled', 'order_unavailable', 0, 0);
+            return;
+        }
         $destination = self::destination((int) $row['destination_id']);
         if (!$destination || $destination['generation'] !== $row['destination_generation'] || $destination['state'] === 'revoked') {
             self::finish($row, 'cancelled', 'destination_changed', 0, 0);
@@ -400,7 +435,7 @@ final class Crm
                 return false;
             }
             $current = Db::row(
-                "SELECT t.state, t.endpoint_origin, e.event_type FROM %i d JOIN %i t ON t.id = d.destination_id JOIN %i e ON e.id = d.event_id
+                "SELECT t.state, t.endpoint_origin, e.event_type, e.order_id FROM %i d JOIN %i t ON t.id = d.destination_id JOIN %i e ON e.id = d.event_id
                  WHERE d.id = %d AND d.lease_token = %s AND d.state = 'leased' AND d.destination_generation = t.generation
                  AND d.lease_until > %s AND d.created_at > %s AND d.cycle_started_at > %s",
                 Db::table('webhook_deliveries'), Db::table('webhook_destinations'), Db::table('webhook_events'),
@@ -408,7 +443,8 @@ final class Crm
             );
             return $current && $current['state'] !== 'revoked' && Outbound::approved($current['endpoint_origin'])
                 && ((int) $row['is_test'] || ($current['state'] === 'active' && Policy::feature('crm', 'capture')
-                    && self::sourceEnabled($current['event_type'])));
+                    && self::sourceEnabled($current['event_type'])
+                    && ($current['event_type'] !== self::ORDER_EVENT || Commerce::canSendOrder((int) $current['order_id']))));
         });
         $status = $result['status'];
         if ($result['code'] === 'policy_paused') {

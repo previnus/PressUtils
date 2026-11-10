@@ -10,16 +10,16 @@ PressUtils appears as **WP Utility Suite** in WordPress. Start with a staging si
 
 ## 2. Download and install
 
-1. Open [Releases](https://github.com/previnus/PressUtils/releases). Under **Assets**, download **wp-utility-suite-0.1.1.zip** and **wp-utility-suite-0.1.1.zip.sha256**.
+1. Open [Releases](https://github.com/previnus/PressUtils/releases). Under **Assets**, download **wp-utility-suite-0.2.0.zip** and **wp-utility-suite-0.2.0.zip.sha256**.
 2. Compare the ZIP's SHA-256 digest with the first value in the checksum file.
 
    ~~~powershell
-   Get-FileHash -Algorithm SHA256 .\wp-utility-suite-0.1.1.zip
-   Get-Content .\wp-utility-suite-0.1.1.zip.sha256
+   Get-FileHash -Algorithm SHA256 .\wp-utility-suite-0.2.0.zip
+   Get-Content .\wp-utility-suite-0.2.0.zip.sha256
    ~~~
 
    ~~~sh
-   shasum -a 256 -c wp-utility-suite-0.1.1.zip.sha256
+   shasum -a 256 -c wp-utility-suite-0.2.0.zip.sha256
    ~~~
 
 3. In wp-admin, go to **Plugins → Add New Plugin → Upload Plugin**. Select the named plugin ZIP, choose **Install Now**, and activate **WP Utility Suite**. GitHub's automatic **Source code** archives are for development.
@@ -115,10 +115,10 @@ Local auditing and diagnostics are available after activation. Alerts, HTTP timi
 ## 6. Upgrade, restore and uninstall
 
 1. Back up the database and matching encryption keyring. Pause outbound traffic before a restore or clone. Revoke inherited destinations on clones before enabling traffic.
-2. Upload the newer release ZIP using the same plugin directory. Select **Replace current with uploaded** when prompted. Confirm module and scheduler status before resuming outbound work.
+2. Upload the newer release ZIP using the same plugin directory. Select **Replace current with uploaded** when prompted. Open **Utility Suite** as an administrator on each active site to run setup. The upgrade from 0.1.1 clears queued order bodies that lack an erasure reference. Confirm module and scheduler status before resuming outbound work.
 3. Deactivate the plugin to retain data and pause delivery. After reactivation, review queued work and resume outbound explicitly.
 4. To keep data during uninstall, deactivate and delete the plugin. To remove suite data, back it up and opt into the purge from **Overview** or **Network Admin → Utility Suite** before uninstalling. Automatic network purge is limited to 20 sites. For larger networks use the [per-site procedure](../wp-utility-suite/readme.txt).
-5. Use WordPress **Tools → Export Personal Data** or **Tools → Erase Personal Data** for local attribution. Review retained note text separately and coordinate privacy handling for queued or previously delivered commerce events with your integration operator.
+5. Use WordPress **Tools → Export Personal Data** or **Tools → Erase Personal Data** for local attribution. PressUtils cancels queued order events when WooCommerce anonymizes the order. Review retained note text separately and coordinate privacy handling for previously delivered events with your integration operator.
 
 ## Support
 

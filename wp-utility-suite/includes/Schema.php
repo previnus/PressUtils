@@ -5,7 +5,7 @@ defined('ABSPATH') || exit;
 
 final class Schema
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     private static function definitions(): array
     {
@@ -121,10 +121,12 @@ final class Schema
                 id bigint unsigned NOT NULL AUTO_INCREMENT,
                 event_uuid char(36) NOT NULL,
                 event_type varchar(40) NOT NULL,
+                order_id bigint unsigned NULL,
                 occurred_at datetime NOT NULL,
                 PRIMARY KEY  (id),
                 UNIQUE KEY event_uuid (event_uuid),
-                KEY occurred (occurred_at,id)",
+                KEY occurred (occurred_at,id),
+                KEY order_event (order_id,event_type)",
             'webhook_deliveries' => "
                 id bigint unsigned NOT NULL AUTO_INCREMENT,
                 delivery_uuid char(36) NOT NULL,
@@ -193,6 +195,14 @@ final class Schema
                 || array_diff($expectedIndexes, array_column(Db::rows('SHOW INDEX FROM %i', $table), 'Key_name'))) {
                 return false;
             }
+        }
+        if (Db::query(
+            "UPDATE %i d JOIN %i e ON e.id = d.event_id SET d.state = 'cancelled', d.body_ciphertext = NULL,
+             d.body_key_id = NULL, d.lease_token = NULL, d.lease_until = NULL, d.last_code = 'legacy_order_unlinked'
+             WHERE e.event_type = %s AND e.order_id IS NULL AND d.body_ciphertext IS NOT NULL",
+            Db::table('webhook_deliveries'), Db::table('webhook_events'), Crm::ORDER_EVENT
+        ) === false) {
+            return false;
         }
         foreach (Settings::defaults() as $module => $config) {
             if (Db::query(

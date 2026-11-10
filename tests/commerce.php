@@ -104,6 +104,26 @@ $notice = ob_get_clean();
 $assert($notice === '', 'Classic shipping notice is suppressed for an ineligible package');
 $cart->empty_cart();
 $zone->delete(true);
+
+require_once WC_ABSPATH . 'includes/class-wc-privacy-erasers.php';
+WC_Privacy_Erasers::remove_order_personal_data($order);
+$afterErase = Db::rows(
+    'SELECT e.event_type, e.order_id, d.state, d.body_ciphertext FROM %i d JOIN %i e ON e.id = d.event_id
+     WHERE d.destination_id = %d AND d.is_test = 0 ORDER BY d.id', Db::table('webhook_deliveries'), Db::table('webhook_events'), $id
+);
+$erased = array_filter($afterErase, static fn (array $row): bool => $row['event_type'] === Crm::ORDER_EVENT);
+$assert(count($erased) === 3 && !array_filter($erased, static fn (array $row): bool =>
+    $row['order_id'] !== null || $row['state'] !== 'cancelled' || $row['body_ciphertext'] !== null
+), 'WooCommerce erasure cancels queued order deliveries and clears their linkage');
+$assert(count(array_filter($afterErase, static fn (array $row): bool =>
+    $row['event_type'] === 'woocommerce.stock_below_threshold' && $row['state'] === 'pending' && $row['body_ciphertext'] !== null
+)) === 2, 'WooCommerce erasure preserves unrelated stock deliveries');
+$order->update_status('completed');
+$assert((int) Db::value(
+    'SELECT COUNT(*) FROM %i d JOIN %i e ON e.id = d.event_id WHERE d.destination_id = %d AND e.event_type = %s',
+    Db::table('webhook_deliveries'), Db::table('webhook_events'), $id, Crm::ORDER_EVENT
+) === 3, 'An anonymized order cannot produce a new webhook');
+
 $assert(Crm::changeState($id, 3, 'revoked') === 'saved', 'Fixture destination revoked before teardown');
 $order->delete(true);
 $product->delete(true);

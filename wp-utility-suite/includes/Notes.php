@@ -19,12 +19,24 @@ final class Notes
         if (!current_user_can('wpus_view_notes') || Policy::state('admin_tools') !== 'active') {
             return ['items' => [], 'next' => 0];
         }
-        $rows = Db::rows('SELECT * FROM %i WHERE id < %d ORDER BY id DESC LIMIT 50', Db::table('admin_notes'), $before);
-        $next = count($rows) === 50 ? (int) end($rows)['id'] : 0;
-        return [
-            'items' => array_values(array_filter($rows, static fn (array $row): bool => self::access((int) $row['post_id']))),
-            'next' => $next,
-        ];
+        $items = [];
+        for ($batch = 0; $batch < 10; $batch++) {
+            $rows = Db::rows('SELECT * FROM %i WHERE id < %d ORDER BY id DESC LIMIT 100', Db::table('admin_notes'), $before);
+            foreach ($rows as $row) {
+                if (!self::access((int) $row['post_id'])) {
+                    continue;
+                }
+                if (count($items) === 50) {
+                    return ['items' => $items, 'next' => (int) $items[49]['id']];
+                }
+                $items[] = $row;
+            }
+            if (count($rows) < 100) {
+                break;
+            }
+            $before = (int) end($rows)['id'];
+        }
+        return ['items' => $items, 'next' => 0];
     }
 
     public static function save(string $title, string $body, int $post, int $id, int $revision): string
